@@ -152,8 +152,13 @@ def cluster_phones(language):
     cached = cached_cluster_maps.get(language)
     if cached:
         return cached
+    phones = list(phone_set(language))
+    cluster_map = cluster_phone_set(phones)
+    cached_cluster_maps[language] = cluster_map
+    return cluster_map
 
-    phones = sorted(list(phone_set(language)))
+def cluster_phone_set(phones):
+    phones = sorted(phones)
     triangle_distance = []
 
     for a in range(len(phones)):
@@ -167,7 +172,6 @@ def cluster_phones(language):
     for index in range(len(clusters)):
         cluster_map[phones[index]] = clusters[index]
     
-    cached_cluster_maps[language] = cluster_map
     return cluster_map
 
 # Short for phone index, maps a word onto its phone clusters
