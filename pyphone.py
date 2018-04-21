@@ -1,5 +1,4 @@
 import data
-import math
 import os
 import json
 import re
@@ -7,8 +6,15 @@ import scipy.cluster.hierarchy as hierarchy
 
 phone_memory = {}
 
+bad_phones = {
+    "ɝ": "ɜ˞",
+}
+
+
 def _get_vector(phones):
     global phone_memory
+    if bad_phones.get(phones):
+        phones = bad_phones.get(phones)
     try:
         if not phones:
             raise ValueError("No phone passed in")
@@ -41,9 +47,11 @@ def _get_vector(phones):
     except KeyError as e:
         raise ValueError("Unrecognized phone %s" % str(e))
 
+
 def is_vowel(phone):
     vec = _get_vector(phone)
     return vec[0]
+
 
 def distance(phoneA, phoneB):
     weights = data.feature_weights
@@ -78,11 +86,15 @@ def distance(phoneA, phoneB):
             different += weights[i]
     return different / total_weights * factor
 
+
 # Change this filter to expand to other languages
 alpha_only = re.compile('[^a-zA-Z]')
+
+
 def tokenize(word):
     word = alpha_only.sub('', word)
     return "".join(["_" + letter for letter in word])
+
 
 def strip_repeats(word):
     stripped = []
@@ -101,8 +113,8 @@ def phoneticize(word, language="english"):
     results = set()
     mappings = get_mapping(language)
     tokenized_mappings = {
-        tokenize(key): list(map(lambda x: "$"+ x, mapping))
-            for (key, mapping) in mappings.items()
+        tokenize(key): list(map(lambda x: "$" + x, mapping))
+        for (key, mapping) in mappings.items()
     }
     while len(next_words) > 0:
         next_word = next_words.pop()
@@ -117,21 +129,26 @@ def phoneticize(word, language="english"):
             results.add(strip_repeats(next_word))
     return results
 
-cached_mappings = {}
+
+cached_json = {}
+
+
 def get_mapping(language):
-    cached = cached_mappings.get(language)
+    cached = cached_json.get(language)
     if cached:
         return cached
-    
     with open(os.path.join(os.path.dirname(__file__),
+                           "data",
                            "mappings",
                            language + ".json")) as f:
         mappings = json.load(f)
-        cached_mappings[language]= mappings
+        cached_json[language] = mappings
         return mappings
 
 
 cached_phone_sets = {}
+
+
 def phone_set(language="english"):
     cached = cached_phone_sets.get(language)
     if cached:
@@ -145,19 +162,34 @@ def phone_set(language="english"):
     cached_phone_sets[language] = phone_set
     return phone_set
 
-cached_cluster_maps = {}
+
+def phonex(word, language="english"):
+    """
+    Short for phone index, maps a word onto a sequence of phone clusters
+    Strips non supported characters (for english, non alpha characters)
+    """
+    phone_variants = phoneticize(word)
+    mappings = cluster_phones(language)
+    results = []
+    for phone_variant in phone_variants:
+        try:
+            phonex_variant = tuple([mappings[phone] for phone in
+                                    phone_variant])
+        except:
+            print(word, phone_variant)
+            exit(1)
+        results.append(phonex_variant)
+    return results
+
 
 CLUSTER_SENSITIVITY = 0.5
-def cluster_phones(language):
-    cached = cached_cluster_maps.get(language)
-    if cached:
-        return cached
-    phones = list(phone_set(language))
-    cluster_map = cluster_phone_set(phones)
-    cached_cluster_maps[language] = cluster_map
-    return cluster_map
+cluster_cache = {}
 
-def cluster_phone_set(phones):
+
+def cluster_phones(language):
+    if cluster_cache.get(language):
+        return cluster_cache[language]
+    phones = sorted(list(phone_set(language)))
     phones = sorted(phones)
     triangle_distance = []
 
@@ -171,22 +203,9 @@ def cluster_phone_set(phones):
 
     for index in range(len(clusters)):
         cluster_map[phones[index]] = clusters[index]
-    
-    return cluster_map
 
-# Short for phone index, maps a word onto its phone clusters
-def phonex(word, language="english"):
-    phone_variants = phoneticize(word)
-    mappings = cluster_phones(language)
-    results = []
-    for phone_variant in phone_variants:
-        try:
-            phonex_variant = tuple([mappings[phone] for phone in phone_variant])
-        except:
-            print(word, phone_variant)
-            exit(1)
-        results.append(phonex_variant)
-    return results
+    cluster_cache[language] = cluster_map
+    return cluster_map
 
 # import pprint
 # pp = pprint.PrettyPrinter(indent=4)
