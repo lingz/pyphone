@@ -1,4 +1,4 @@
-import data
+from pyphone import data
 import os
 import json
 import re
@@ -101,14 +101,14 @@ def strip_repeats(word):
     last_letter = None
     word = filter(None, word.split("$"))
     for letter in word:
-        if letter != last_letter:
+        if letter != last_letter and not letter.startswith('_'):
             stripped.append(letter)
         last_letter = letter
     return tuple(stripped)
 
 
 def phoneticize(word, language="english"):
-    tokenized = tokenize(word)
+    tokenized = tokenize(word.lower())
     next_words = set([tokenized])
     results = set()
     mappings = get_mapping(language)
@@ -175,10 +175,10 @@ def phonex(word, language="english"):
         try:
             phonex_variant = tuple([mappings[phone] for phone in
                                     phone_variant])
+            results.append(phonex_variant)
         except:
-            print(word, phone_variant)
+            print('Error:', word, phone_variant)
             exit(1)
-        results.append(phonex_variant)
     return results
 
 
